@@ -33,37 +33,65 @@ export async function buildStarterPack() {
 }
 
 async function resolveSeed(seed) {
-  const videoId = await findSeedVideoId(seed);
+  const seedVideo = await findSeedVideo(seed);
 
-  if (!videoId) {
+  if (!seedVideo?.videoId) {
     return null;
   }
 
-  const mixUrl = `https://www.youtube.com/watch?v=${videoId}&list=RD${videoId}&start_radio=1`;
+  const mixUrl = `https://www.youtube.com/watch?v=${seedVideo.videoId}&list=RD${seedVideo.videoId}&start_radio=1`;
   const resolved = await resolveYoutubeRequest({ url: mixUrl });
 
   if (!resolved.tracks || resolved.tracks.length === 0) {
     return null;
   }
 
+  const sourceTitle = preferredTitle({
+    resolvedTitle: resolved.source?.title,
+    seedTitle: seedVideo.title,
+    seedLabel: seed.label
+  });
+
   return {
-    source: { ...resolved.source, watchUrl: mixUrl },
+    source: {
+      ...resolved.source,
+      title: sourceTitle,
+      watchUrl: mixUrl
+    },
     tracks: resolved.tracks,
     extracted: resolved.extracted
   };
 }
 
-async function findSeedVideoId(seed) {
+function preferredTitle({ resolvedTitle, seedTitle, seedLabel }) {
+  const generic = (value) => !value || /^(YouTube Mix|Generated YouTube Mix|YouTube playlist)$/i.test(value.trim());
+
+  if (!generic(resolvedTitle)) {
+    return resolvedTitle;
+  }
+
+  if (!generic(seedTitle)) {
+    return `${seedLabel} - ${seedTitle}`;
+  }
+
+  return seedLabel;
+}
+
+async function findSeedVideo(seed) {
   try {
     const search = await searchYoutubeRequest({ query: seed.query, maxResults: 5 });
     const top = search.results?.[0];
 
     if (top?.videoId) {
-      return top.videoId;
+      return { videoId: top.videoId, title: top.title || "" };
     }
   } catch {
     // Fall through to fallback below.
   }
 
-  return seed.fallbackVideoId || null;
+  if (seed.fallbackVideoId) {
+    return { videoId: seed.fallbackVideoId, title: "" };
+  }
+
+  return null;
 }
