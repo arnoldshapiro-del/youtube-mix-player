@@ -58,6 +58,8 @@ function bindElements() {
     castDialog: document.querySelector("#cast-dialog"),
     castStatus: document.querySelector("#cast-status"),
     fullscreenButton: document.querySelector("#fullscreen-button"),
+    playerFullscreenButton: document.querySelector("#player-fullscreen"),
+    videoShell: document.querySelector(".video-shell"),
     copyTvLinkButton: document.querySelector("#copy-tv-link-button"),
     youtubeCastButton: document.querySelector("#youtube-cast-button"),
     playerCover: document.querySelector("#player-cover"),
@@ -350,6 +352,36 @@ function bindEvents() {
       document.exitFullscreen?.();
     }
   });
+
+  if (els.playerFullscreenButton && els.videoShell) {
+    const target = els.videoShell;
+    const enterFs = () => {
+      const req = target.requestFullscreen
+        || target.webkitRequestFullscreen
+        || target.webkitEnterFullscreen
+        || target.mozRequestFullScreen
+        || target.msRequestFullscreen;
+      if (req) req.call(target);
+    };
+    const exitFs = () => {
+      const exit = document.exitFullscreen
+        || document.webkitExitFullscreen
+        || document.mozCancelFullScreen
+        || document.msExitFullscreen;
+      if (exit) exit.call(document);
+    };
+    els.playerFullscreenButton.addEventListener("click", () => {
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (isFs) exitFs(); else enterFs();
+    });
+    const updateFsIcon = () => {
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      els.playerFullscreenButton.classList.toggle("is-fullscreen", !!isFs);
+      els.playerFullscreenButton.setAttribute("aria-label", isFs ? "Exit fullscreen" : "Fullscreen video");
+    };
+    document.addEventListener("fullscreenchange", updateFsIcon);
+    document.addEventListener("webkitfullscreenchange", updateFsIcon);
+  }
 
   els.tvModeButton.addEventListener("click", () => {
     const enabled = document.body.classList.toggle("is-tv");
