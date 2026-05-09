@@ -42,7 +42,10 @@ const state = {
   sleepTimer: { mode: null, endTime: 0 },
   lyricsOpen: false,
   lyrics: { fetchedKey: "", lines: [], synced: false, plain: "" },
-  preMuteVolume: 82
+  preMuteVolume: 82,
+  searchHqMode: false,
+  searchHqStats: null,
+  previewedMixId: ""
 };
 
 const RECENT_HISTORY_LIMIT = 12;
@@ -357,6 +360,11 @@ function bindEvents() {
     if (button.dataset.action === "remove-mix") {
       removeLibraryMix(id);
     }
+
+    if (button.dataset.action === "preview-mix") {
+      state.previewedMixId = state.previewedMixId === id ? "" : id;
+      renderLibrary();
+    }
   });
 
   els.copyLinkButton.addEventListener("click", () => copyText(buildShareUrl(), "App link copied."));
@@ -474,10 +482,42 @@ function bindMoreByArtistEvent() {
     }
     if (els.searchInput) {
       els.searchInput.value = artist;
-      runSearch(artist);
       els.searchInput.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+    runHqArtistSearch(artist);
   });
+}
+
+async function runHqArtistSearch(artist) {
+  state.searchQuery = artist;
+  state.searching = true;
+  state.searchHqMode = true;
+  els.searchResultsShell.hidden = false;
+  els.searchClear.hidden = false;
+  els.searchStatus.classList.remove("is-error");
+  els.searchStatus.textContent = `Finding high-quality videos by ${artist} — this can take 5-10 seconds (running 6 parallel searches and filtering out covers, lyric videos, and low-quality uploads)...`;
+  els.searchResults.innerHTML = "";
+
+  try {
+    const response = await fetch(`/api/hq-artist?artist=${encodeURIComponent(artist)}`);
+    const payload = await response.json();
+
+    if (!payload.ok) {
+      throw new Error(payload.error || "HQ search failed.");
+    }
+
+    state.searchResults = Array.isArray(payload.results) ? payload.results : [];
+    state.searching = false;
+    state.searchHqStats = { candidates: payload.candidates, queriesRun: payload.queriesRun };
+    renderSearch();
+  } catch (error) {
+    state.searching = false;
+    state.searchResults = [];
+    state.searchHqMode = false;
+    els.searchStatus.classList.add("is-error");
+    els.searchStatus.textContent = error?.message || "HQ search failed. Try again.";
+    els.searchResults.innerHTML = "";
+  }
 }
 
 function bindShareTimeEvent() {
@@ -1078,6 +1118,7 @@ function applyQualityPreference() {
 async function runSearch(query) {
   state.searchQuery = query;
   state.searching = true;
+  state.searchHqMode = false;
   els.searchResultsShell.hidden = false;
   els.searchClear.hidden = false;
   els.searchStatus.classList.remove("is-error");
@@ -1189,7 +1230,12 @@ function renderSearch() {
   }
 
   els.searchStatus.classList.remove("is-error");
-  els.searchStatus.textContent = `${state.searchResults.length} results for "${state.searchQuery}". Click "Play as Mix" to load YouTube's auto-generated Mix from any song.`;
+  if (state.searchHqMode) {
+    const stats = state.searchHqStats || {};
+    els.searchStatus.textContent = `💎 ${state.searchResults.length} HIGH-QUALITY videos by ${state.searchQuery} (filtered ${stats.candidates || 0} candidates from ${stats.queriesRun || 0} parallel searches — only official channels, high-view-count, and verified versions kept). Click "Play as Mix" on any to load YouTube's Mix starting from that song.`;
+  } else {
+    els.searchStatus.textContent = `${state.searchResults.length} results for "${state.searchQuery}". Click "Play as Mix" to load YouTube's auto-generated Mix from any song.`;
+  }
 
   for (const result of state.searchResults) {
     const card = document.createElement("article");
@@ -1218,6 +1264,20 @@ function renderSearch() {
     const meta = document.createElement("p");
     meta.className = "search-card-meta";
     meta.textContent = [result.channel, result.viewCountText, result.publishedText].filter(Boolean).join(" • ");
+
+    if (state.searchHqMode && result.quality) {
+      const badge = document.createElement("span");
+      badge.className = "search-card-quality";
+      const score = result.quality.score;
+      let tier = "good";
+      if (score >= 100) tier = "premium";
+      else if (score >= 60) tier = "great";
+      badge.dataset.tier = tier;
+      const tierLabel = tier === "premium" ? "💎 Premium" : tier === "great" ? "⭐ Great" : "✓ Good";
+      badge.textContent = `${tierLabel} quality`;
+      meta.appendChild(document.createElement("br"));
+      meta.appendChild(badge);
+    }
 
     const actions = document.createElement("div");
     actions.className = "search-card-actions";
@@ -1485,8 +1545,9 @@ function renderLibrary() {
   const fragment = document.createDocumentFragment();
 
   for (const mix of state.library) {
+    const isPreviewed = state.previewedMixId === mix.id;
     const card = document.createElement("article");
-    card.className = `mix-card${state.source?.id === mix.id ? " is-active" : ""}`;
+    card.className = `mix-card${state.source?.id === mix.id ? " is-active" : ""}${isPreviewed ? " is-previewed" : ""}`;
 
     const strip = document.createElement("div");
     strip.className = "mix-strip";
@@ -1514,14 +1575,57 @@ function renderLibrary() {
     loadButton.dataset.id = mix.id;
     loadButton.textContent = "Load";
 
+    const previewButton = document.createElement("button");
+    previewButton.type = "button";
+    previewButton.dataset.action = "preview-mix";
+    previewButton.dataset.id = mix.id;
+    previewButton.textContent = isPreviewed ? "Hide songs" : "See songs";
+
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.dataset.action = "remove-mix";
     removeButton.dataset.id = mix.id;
     removeButton.textContent = "Remove";
 
-    actions.append(loadButton, removeButton);
+    actions.append(loadButton, previewButton, removeButton);
     card.append(strip, title, meta, actions);
+
+    if (isPreviewed) {
+      const previewPanel = document.createElement("div");
+      previewPanel.className = "mix-preview-panel";
+
+      const list = document.createElement("ol");
+      list.className = "mix-preview-list";
+
+      for (const track of mix.tracks) {
+        const item = document.createElement("li");
+        item.className = "mix-preview-item";
+
+        const thumb = document.createElement("img");
+        thumb.src = track.thumbnail || thumbnailFor(track.videoId);
+        thumb.alt = "";
+        thumb.loading = "lazy";
+
+        const body = document.createElement("div");
+        body.className = "mix-preview-body";
+
+        const trackTitle = document.createElement("p");
+        trackTitle.className = "mix-preview-title";
+        trackTitle.textContent = track.title;
+
+        const trackMeta = document.createElement("p");
+        trackMeta.className = "mix-preview-meta";
+        trackMeta.textContent = [track.channel, track.durationText].filter(Boolean).join(" • ");
+
+        body.append(trackTitle, trackMeta);
+        item.append(thumb, body);
+        list.append(item);
+      }
+
+      previewPanel.append(list);
+      card.append(previewPanel);
+    }
+
     fragment.append(card);
   }
 

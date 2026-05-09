@@ -4,7 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveYoutubeRequest } from "./src/playlistResolver.js";
-import { searchYoutubeRequest } from "./src/searchResolver.js";
+import { searchYoutubeRequest, highQualityArtistSearchRequest } from "./src/searchResolver.js";
 import { buildStarterPack } from "./src/starterMixes.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -96,6 +96,35 @@ async function handleSearch(request, response) {
   }
 }
 
+async function handleHqArtist(request, response) {
+  try {
+    const requestUrl = new URL(request.url || "/", `http://127.0.0.1:${port}`);
+    let artist = requestUrl.searchParams.get("artist") || "";
+    let maxResults = Number(requestUrl.searchParams.get("limit")) || 40;
+
+    if (request.method === "POST") {
+      const body = await readBody(request);
+      const data = JSON.parse(body || "{}");
+      artist = String(data.artist || "");
+      if (Number.isFinite(Number(data.limit))) maxResults = Number(data.limit);
+    }
+
+    if (!artist.trim()) {
+      sendJson(response, { ok: false, error: "Pass an artist name." }, 400);
+      return;
+    }
+
+    const result = await highQualityArtistSearchRequest({ artist, maxResults });
+    sendJson(response, { ok: true, ...result });
+  } catch (error) {
+    sendJson(
+      response,
+      { ok: false, error: error instanceof Error ? error.message : "Unable to run HQ artist search." },
+      422
+    );
+  }
+}
+
 async function handleStarterPack(_request, response) {
   try {
     const result = await buildStarterPack();
@@ -139,6 +168,11 @@ createServer(async (request, response) => {
 
   if (requestUrl.pathname === "/api/starter-pack") {
     await handleStarterPack(request, response);
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/hq-artist") {
+    await handleHqArtist(request, response);
     return;
   }
 

@@ -1,5 +1,63 @@
 import { extractInitialData, fetchYoutubeHtml } from "./playlistResolver.js";
 import { normalizeTrack, thumbnailFor } from "./youtubeTools.js";
+import { rankByQuality } from "./qualityScorer.js";
+
+export async function highQualityArtistSearchRequest({ artist, maxResults = 40 } = {}) {
+  const trimmed = String(artist || "").trim();
+
+  if (!trimmed) {
+    throw new Error("Pass an artist name.");
+  }
+
+  // Run multiple parallel searches with quality-targeting modifiers
+  const queries = [
+    `${trimmed} official video`,
+    `${trimmed} VEVO`,
+    `${trimmed} official audio`,
+    `${trimmed} live HD`,
+    `${trimmed} greatest hits`,
+    `${trimmed} live concert`
+  ];
+
+  const searchResults = await Promise.allSettled(
+    queries.map((q) => runSingleSearch(q, 25))
+  );
+
+  const seen = new Set();
+  const combined = [];
+
+  for (const search of searchResults) {
+    if (search.status !== "fulfilled" || !Array.isArray(search.value)) continue;
+    for (const result of search.value) {
+      if (seen.has(result.videoId)) continue;
+      seen.add(result.videoId);
+      combined.push(result);
+    }
+  }
+
+  const ranked = rankByQuality(combined, trimmed, { minScore: 30 });
+
+  return {
+    artist: trimmed,
+    count: ranked.length,
+    queriesRun: queries.length,
+    candidates: combined.length,
+    results: ranked.slice(0, maxResults)
+  };
+}
+
+async function runSingleSearch(query, maxResults) {
+  try {
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const html = await fetchYoutubeHtml(url);
+    const initialData = extractInitialData(html);
+    return collectSearchResults(initialData)
+      .slice(0, maxResults)
+      .map((item, index) => normalizeSearchResult(item, index));
+  } catch {
+    return [];
+  }
+}
 
 export async function searchYoutubeRequest({ query, maxResults = 30 } = {}) {
   const trimmed = String(query || "").trim();

@@ -372,6 +372,32 @@ img {
   color: rgba(255, 255, 255, 0.7);
 }
 
+.search-card-quality {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.search-card-quality[data-tier="premium"] {
+  background: linear-gradient(90deg, #facc15, #f59e0b);
+  color: #1a1500;
+}
+
+.search-card-quality[data-tier="great"] {
+  background: linear-gradient(90deg, #34d399, #10b981);
+  color: #052e1a;
+}
+
+.search-card-quality[data-tier="good"] {
+  background: rgba(96, 165, 250, 0.25);
+  color: #93c5fd;
+}
+
 .search-card-actions {
   display: flex;
   gap: 6px;
@@ -1159,8 +1185,80 @@ img {
 
 .mix-card-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 6px;
+}
+
+.mix-card-actions button {
+  padding: 7px 8px;
+  font-size: 0.82rem;
+}
+
+.mix-preview-panel {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.mix-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mix-preview-item {
+  display: grid;
+  grid-template-columns: 56px 1fr;
   gap: 8px;
+  padding: 4px;
+  border-radius: 6px;
+  align-items: center;
+}
+
+.mix-preview-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mix-preview-item img {
+  width: 56px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.mix-preview-body {
+  min-width: 0;
+}
+
+.mix-preview-title {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.mix-preview-meta {
+  margin: 2px 0 0 !important;
+  font-size: 0.72rem !important;
+  color: var(--muted) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mix-card.is-previewed {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(96, 165, 250, 0.04);
 }
 
 .stats {
