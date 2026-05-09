@@ -456,6 +456,44 @@ img {
   padding: 18px;
 }
 
+.starter-pack-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+
+.starter-pack-button {
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--accent, #f5533d);
+  background: var(--accent, #f5533d);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+.starter-pack-button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.starter-pack-button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.starter-pack-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
+  min-height: 1.1em;
+}
+
+.starter-pack-status.is-error {
+  color: var(--red-strong, #ff5454);
+}
+
 .player-column,
 .queue-column,
 .library-panel,

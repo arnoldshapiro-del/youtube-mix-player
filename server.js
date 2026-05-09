@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { resolveYoutubeRequest } from "./src/playlistResolver.js";
 import { searchYoutubeRequest } from "./src/searchResolver.js";
+import { buildStarterPack } from "./src/starterMixes.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -95,6 +96,19 @@ async function handleSearch(request, response) {
   }
 }
 
+async function handleStarterPack(_request, response) {
+  try {
+    const result = await buildStarterPack();
+    sendJson(response, { ok: true, ...result });
+  } catch (error) {
+    sendJson(
+      response,
+      { ok: false, error: error instanceof Error ? error.message : "Unable to build starter pack." },
+      422
+    );
+  }
+}
+
 function getFilePath(urlPath) {
   const cleanPath = urlPath === "/" ? "/index.html" : decodeURIComponent(urlPath);
   const resolved = normalize(join(root, cleanPath));
@@ -120,6 +134,11 @@ createServer(async (request, response) => {
 
   if (requestUrl.pathname === "/api/search-youtube") {
     await handleSearch(request, response);
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/starter-pack") {
+    await handleStarterPack(request, response);
     return;
   }
 

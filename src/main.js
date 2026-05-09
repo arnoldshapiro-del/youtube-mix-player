@@ -95,7 +95,9 @@ function bindElements() {
     searchClear: document.querySelector("#search-clear"),
     searchResultsShell: document.querySelector("#search-results-shell"),
     searchResults: document.querySelector("#search-results"),
-    searchStatus: document.querySelector("#search-status")
+    searchStatus: document.querySelector("#search-status"),
+    starterPackButton: document.querySelector("#starter-pack-button"),
+    starterPackStatus: document.querySelector("#starter-pack-status")
   });
 }
 
@@ -215,6 +217,10 @@ function bindEvents() {
       renderSearch();
       els.searchInput.focus();
     });
+  }
+
+  if (els.starterPackButton) {
+    els.starterPackButton.addEventListener("click", loadStarterPack);
   }
 
   if (els.searchResults) {
@@ -802,6 +808,65 @@ async function runSearch(query) {
     els.searchStatus.classList.add("is-error");
     els.searchStatus.textContent = error?.message || "Search failed. Try again.";
     els.searchResults.innerHTML = "";
+  }
+}
+
+async function loadStarterPack() {
+  if (!els.starterPackButton) {
+    return;
+  }
+
+  els.starterPackButton.disabled = true;
+  els.starterPackStatus.classList.remove("is-error");
+  els.starterPackStatus.textContent = "Loading 10 curated mixes (this takes ~20-40 seconds the first time)...";
+
+  try {
+    const response = await fetch("/api/starter-pack");
+    const payload = await response.json();
+
+    if (!payload.ok || !Array.isArray(payload.mixes) || payload.mixes.length === 0) {
+      throw new Error(payload.error || "Starter pack returned no mixes.");
+    }
+
+    let added = 0;
+
+    for (const mix of payload.mixes) {
+      if (!mix?.source || !Array.isArray(mix.tracks) || mix.tracks.length === 0) {
+        continue;
+      }
+
+      const id = mix.source.id || mix.source.listId || mix.source.videoId;
+
+      if (!id) {
+        continue;
+      }
+
+      const libraryItem = {
+        id,
+        title: mix.source.title || mix.tracks[0]?.title || "YouTube Mix",
+        type: mix.source.type || "mix",
+        listId: mix.source.listId || "",
+        videoId: mix.source.videoId || mix.tracks[0]?.videoId || "",
+        watchUrl: mix.source.watchUrl || `https://www.youtube.com/watch?v=${mix.source.videoId || ""}&list=${mix.source.listId || ""}`,
+        importedAt: mix.source.importedAt || new Date().toISOString(),
+        tracks: mix.tracks
+      };
+
+      state.library = [libraryItem, ...state.library.filter((item) => item.id !== id)];
+      added += 1;
+    }
+
+    state.library = state.library.slice(0, MAX_LIBRARY_ITEMS);
+    saveState();
+    renderLibrary();
+    renderStats();
+
+    els.starterPackStatus.textContent = `Added ${added} mix${added === 1 ? "" : "es"} to your library. Click any mix on the right to play it.`;
+  } catch (error) {
+    els.starterPackStatus.classList.add("is-error");
+    els.starterPackStatus.textContent = error?.message || "Could not load the starter pack. Try again in a moment.";
+  } finally {
+    els.starterPackButton.disabled = false;
   }
 }
 
