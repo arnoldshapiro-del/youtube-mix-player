@@ -223,12 +223,237 @@ img {
   padding: 0 14px;
 }
 
+.search-bar {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(19, 22, 28, 0.9);
+  box-shadow: 0 22px 70px var(--shadow);
+  padding: 12px 14px;
+}
+
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-icon {
+  font-size: 1.1rem;
+  opacity: 0.85;
+}
+
+.search-form input[type="search"] {
+  flex: 1 1 360px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 10, 14, 0.85);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.search-form input[type="search"]:focus {
+  outline: 2px solid var(--accent, #f5533d);
+  outline-offset: 0;
+}
+
+.search-results-shell {
+  margin-top: 14px;
+}
+
+.search-results-shell[hidden] {
+  display: none;
+}
+
+.search-status {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.search-status.is-error {
+  color: var(--red-strong, #ff5454);
+}
+
+.search-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding: 4px 4px 8px;
+}
+
+.search-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(15, 18, 24, 0.95);
+}
+
+.search-card-thumb {
+  position: relative;
+  border-radius: 6px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: #05070a;
+}
+
+.search-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-card-duration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.search-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.search-card-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.search-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.search-card-actions button {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.search-card-actions button.primary {
+  background: var(--accent, #f5533d);
+  border-color: var(--accent, #f5533d);
+  color: #fff;
+  font-weight: 600;
+}
+
+.search-card-actions button:hover {
+  filter: brightness(1.1);
+}
+
+.size-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(8, 10, 14, 0.5);
+}
+
+.size-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.size-buttons {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.size-button {
+  padding: 7px 14px;
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.size-button:last-child {
+  border-right: none;
+}
+
+.size-button[aria-pressed="true"] {
+  background: var(--accent, #f5533d);
+  color: #fff;
+  font-weight: 600;
+}
+
+.size-button:hover:not([aria-pressed="true"]) {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.size-hint {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+  flex: 1;
+  min-width: 220px;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(420px, 1.22fr) minmax(340px, 0.82fr) minmax(260px, 0.56fr);
   gap: 16px;
   align-items: start;
   margin-top: 16px;
+}
+
+.size-cinema .workspace {
+  grid-template-columns: minmax(560px, 2fr) minmax(300px, 0.78fr) minmax(240px, 0.5fr);
+}
+
+.size-theater .workspace {
+  grid-template-columns: minmax(640px, 2.6fr) minmax(280px, 0.7fr);
+}
+
+.size-theater .mix-column {
+  display: none;
+}
+
+.size-max .workspace {
+  grid-template-columns: 1fr;
+}
+
+.size-max .queue-column,
+.size-max .mix-column {
+  display: none;
+}
+
+.size-max .player-column {
+  padding: 18px;
 }
 
 .player-column,

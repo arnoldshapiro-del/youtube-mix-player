@@ -44,6 +44,27 @@
         </div>
       </header>
 
+      <section class="search-bar" aria-label="Search YouTube for songs and mixes">
+        <form id="search-form" class="search-form">
+          <span class="search-icon" aria-hidden="true">&#128269;</span>
+          <label class="sr-only" for="search-query">Search YouTube</label>
+          <input
+            id="search-query"
+            name="search-query"
+            type="search"
+            placeholder="Search YouTube for a song, artist, or anything — then click Play as Mix on any result"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="primary-button" type="submit">Search</button>
+          <button id="search-clear" class="small-button" type="button" hidden>Clear</button>
+        </form>
+        <div id="search-results-shell" class="search-results-shell" hidden>
+          <p id="search-status" class="search-status" aria-live="polite"></p>
+          <div id="search-results" class="search-results"></div>
+        </div>
+      </section>
+
       <section class="workspace">
         <section class="player-column" aria-label="Player">
           <div class="video-shell">
@@ -94,10 +115,32 @@
                 <option value="2">2x</option>
               </select>
             </label>
+            <label class="field compact-field">
+              <span>Quality</span>
+              <select id="quality-select">
+                <option value="auto">Auto</option>
+                <option value="hd2160">2160p (4K)</option>
+                <option value="hd1440">1440p</option>
+                <option value="hd1080" selected>1080p</option>
+                <option value="hd720">720p</option>
+                <option value="large">480p</option>
+              </select>
+            </label>
             <label class="field volume-field">
               <span>Volume</span>
               <input id="volume-slider" type="range" min="0" max="100" value="82" />
             </label>
+          </section>
+
+          <section class="size-row" aria-label="Player size">
+            <span class="size-label">Player size</span>
+            <div class="size-buttons" role="group" aria-label="Player size presets">
+              <button class="size-button" type="button" data-size="cozy" aria-pressed="false">Cozy</button>
+              <button class="size-button" type="button" data-size="cinema" aria-pressed="true">Cinema</button>
+              <button class="size-button" type="button" data-size="theater" aria-pressed="false">Theater</button>
+              <button class="size-button" type="button" data-size="max" aria-pressed="false">Max</button>
+            </div>
+            <span class="size-hint">Cinema is the sweet spot. Theater hides the right column. Max gives the player the whole window.</span>
           </section>
         </section>
 

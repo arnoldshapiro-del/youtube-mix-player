@@ -48,7 +48,7 @@ export async function resolveYoutubeRequest({ url, maxResults = 150 } = {}) {
   };
 }
 
-async function fetchYoutubeHtml(url) {
+export async function fetchYoutubeHtml(url) {
   try {
     const response = await fetch(url, {
       headers: {

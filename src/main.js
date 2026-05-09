@@ -11,6 +11,9 @@ import {
 
 const STORAGE_KEY = "youtube-mix-player:v1";
 const MAX_LIBRARY_ITEMS = 18;
+const SIZE_PRESETS = ["cozy", "cinema", "theater", "max"];
+const DEFAULT_SIZE = "cinema";
+const DEFAULT_QUALITY = "hd1080";
 
 const state = {
   playerReady: false,
@@ -29,7 +32,12 @@ const state = {
   tracks: [],
   library: [],
   favorites: new Set(),
-  played: new Set()
+  played: new Set(),
+  size: DEFAULT_SIZE,
+  quality: DEFAULT_QUALITY,
+  searchQuery: "",
+  searchResults: [],
+  searching: false
 };
 
 let player = null;
@@ -79,7 +87,15 @@ function bindElements() {
     savedCount: document.querySelector("#saved-count"),
     mixCount: document.querySelector("#mix-count"),
     openYoutubeButton: document.querySelector("#open-youtube-button"),
-    clearPlayedButton: document.querySelector("#clear-played-button")
+    clearPlayedButton: document.querySelector("#clear-played-button"),
+    qualitySelect: document.querySelector("#quality-select"),
+    sizeButtons: Array.from(document.querySelectorAll(".size-button")),
+    searchForm: document.querySelector("#search-form"),
+    searchInput: document.querySelector("#search-query"),
+    searchClear: document.querySelector("#search-clear"),
+    searchResultsShell: document.querySelector("#search-results-shell"),
+    searchResults: document.querySelector("#search-results"),
+    searchStatus: document.querySelector("#search-status")
   });
 }
 
@@ -98,6 +114,8 @@ function loadSavedState() {
   state.volume = Number.isFinite(saved.volume) ? saved.volume : 82;
   state.shuffle = Boolean(saved.shuffle);
   state.repeat = saved.repeat || "all";
+  state.size = SIZE_PRESETS.includes(saved.size) ? saved.size : DEFAULT_SIZE;
+  state.quality = typeof saved.quality === "string" && saved.quality ? saved.quality : DEFAULT_QUALITY;
 }
 
 function saveState() {
@@ -109,7 +127,9 @@ function saveState() {
       played: Array.from(state.played),
       volume: state.volume,
       shuffle: state.shuffle,
-      repeat: state.repeat
+      repeat: state.repeat,
+      size: state.size,
+      quality: state.quality
     })
   );
 }
@@ -150,6 +170,82 @@ function bindEvents() {
       player.setPlaybackRate(Number(els.speedSelect.value));
     }
   });
+
+  if (els.qualitySelect) {
+    els.qualitySelect.addEventListener("change", () => {
+      state.quality = els.qualitySelect.value;
+      saveState();
+      applyQualityPreference();
+    });
+  }
+
+  for (const button of els.sizeButtons) {
+    button.addEventListener("click", () => {
+      const target = button.dataset.size;
+
+      if (!SIZE_PRESETS.includes(target)) {
+        return;
+      }
+
+      state.size = target;
+      saveState();
+      applySize();
+      applyQualityPreference();
+    });
+  }
+
+  if (els.searchForm) {
+    els.searchForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const query = els.searchInput.value.trim();
+
+      if (!query) {
+        return;
+      }
+
+      runSearch(query);
+    });
+  }
+
+  if (els.searchClear) {
+    els.searchClear.addEventListener("click", () => {
+      els.searchInput.value = "";
+      state.searchQuery = "";
+      state.searchResults = [];
+      renderSearch();
+      els.searchInput.focus();
+    });
+  }
+
+  if (els.searchResults) {
+    els.searchResults.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-action]");
+
+      if (!button) {
+        return;
+      }
+
+      const videoId = button.dataset.videoId;
+      const action = button.dataset.action;
+      const result = state.searchResults.find((entry) => entry.videoId === videoId);
+
+      if (!result || !videoId) {
+        return;
+      }
+
+      if (action === "play-mix") {
+        const url = result.mixUrl || `https://www.youtube.com/watch?v=${videoId}&list=RD${videoId}&start_radio=1`;
+        els.youtubeUrl.value = url;
+        loadSource(url, { play: true });
+      }
+
+      if (action === "play-video") {
+        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        els.youtubeUrl.value = url;
+        loadSource(url, { play: true });
+      }
+    });
+  }
 
   els.volumeSlider.addEventListener("input", () => {
     state.volume = Number(els.volumeSlider.value);
@@ -635,6 +731,7 @@ function onPlayerReady(event) {
   player.setVolume?.(state.volume);
   els.volumeSlider.value = String(state.volume);
   setStatus("Ready");
+  applyQualityPreference();
 
   if (state.tracks.length > 0) {
     if (state.nativeListMode) {
@@ -648,6 +745,141 @@ function onPlayerReady(event) {
   renderAll();
 }
 
+function applySize() {
+  for (const preset of SIZE_PRESETS) {
+    document.body.classList.toggle(`size-${preset}`, state.size === preset);
+  }
+
+  for (const button of els.sizeButtons) {
+    button.setAttribute("aria-pressed", String(button.dataset.size === state.size));
+  }
+}
+
+function applyQualityPreference() {
+  if (els.qualitySelect && els.qualitySelect.value !== state.quality) {
+    els.qualitySelect.value = state.quality;
+  }
+
+  if (!player?.setPlaybackQuality || state.quality === "auto") {
+    return;
+  }
+
+  try {
+    player.setPlaybackQuality(state.quality);
+  } catch {
+    // YouTube ignores quality requests it can't honor — that's fine.
+  }
+}
+
+async function runSearch(query) {
+  state.searchQuery = query;
+  state.searching = true;
+  els.searchResultsShell.hidden = false;
+  els.searchClear.hidden = false;
+  els.searchStatus.classList.remove("is-error");
+  els.searchStatus.textContent = `Searching YouTube for "${query}"...`;
+  els.searchResults.innerHTML = "";
+
+  try {
+    const response = await fetch("/api/search-youtube", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, limit: 30 })
+    });
+
+    const payload = await response.json();
+
+    if (!payload.ok) {
+      throw new Error(payload.error || "Search failed.");
+    }
+
+    state.searchResults = Array.isArray(payload.results) ? payload.results : [];
+    state.searching = false;
+    renderSearch();
+  } catch (error) {
+    state.searching = false;
+    state.searchResults = [];
+    els.searchStatus.classList.add("is-error");
+    els.searchStatus.textContent = error?.message || "Search failed. Try again.";
+    els.searchResults.innerHTML = "";
+  }
+}
+
+function renderSearch() {
+  if (!els.searchResults || !els.searchStatus) {
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  if (state.searchResults.length === 0) {
+    if (state.searchQuery && !state.searching) {
+      els.searchStatus.textContent = `No results for "${state.searchQuery}".`;
+    } else if (!state.searching) {
+      els.searchStatus.textContent = "";
+      els.searchResultsShell.hidden = true;
+      els.searchClear.hidden = true;
+    }
+
+    els.searchResults.replaceChildren(fragment);
+    return;
+  }
+
+  els.searchStatus.classList.remove("is-error");
+  els.searchStatus.textContent = `${state.searchResults.length} results for "${state.searchQuery}". Click "Play as Mix" to load YouTube's auto-generated Mix from any song.`;
+
+  for (const result of state.searchResults) {
+    const card = document.createElement("article");
+    card.className = "search-card";
+
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "search-card-thumb";
+
+    const img = document.createElement("img");
+    img.src = result.thumbnail || "";
+    img.alt = "";
+    img.loading = "lazy";
+    thumbWrap.append(img);
+
+    if (result.durationText) {
+      const duration = document.createElement("span");
+      duration.className = "search-card-duration";
+      duration.textContent = result.durationText;
+      thumbWrap.append(duration);
+    }
+
+    const title = document.createElement("p");
+    title.className = "search-card-title";
+    title.textContent = result.title;
+
+    const meta = document.createElement("p");
+    meta.className = "search-card-meta";
+    meta.textContent = [result.channel, result.viewCountText, result.publishedText].filter(Boolean).join(" • ");
+
+    const actions = document.createElement("div");
+    actions.className = "search-card-actions";
+
+    const mixButton = document.createElement("button");
+    mixButton.type = "button";
+    mixButton.className = "primary";
+    mixButton.dataset.action = "play-mix";
+    mixButton.dataset.videoId = result.videoId;
+    mixButton.textContent = "Play as Mix";
+
+    const videoButton = document.createElement("button");
+    videoButton.type = "button";
+    videoButton.dataset.action = "play-video";
+    videoButton.dataset.videoId = result.videoId;
+    videoButton.textContent = "Just the video";
+
+    actions.append(mixButton, videoButton);
+    card.append(thumbWrap, title, meta, actions);
+    fragment.append(card);
+  }
+
+  els.searchResults.replaceChildren(fragment);
+}
+
 function onPlayerStateChange(event) {
   const playerState = window.YT?.PlayerState;
   state.isPlaying = event.data === playerState?.PLAYING;
@@ -657,6 +889,7 @@ function onPlayerStateChange(event) {
     syncVideoData();
     updateMediaSession();
     requestWakeLock();
+    applyQualityPreference();
   }
 
   if (event.data === playerState?.PAUSED || event.data === playerState?.ENDED) {
@@ -1086,6 +1319,12 @@ function init() {
   loadSavedState();
   bindEvents();
   setupCastFlag();
+  applySize();
+
+  if (els.qualitySelect) {
+    els.qualitySelect.value = state.quality;
+  }
+
   renderAll();
   loadYouTubeApi();
   loadInitialSource();

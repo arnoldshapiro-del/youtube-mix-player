@@ -4,6 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveYoutubeRequest } from "./src/playlistResolver.js";
+import { searchYoutubeRequest } from "./src/searchResolver.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -62,6 +63,38 @@ async function handleApi(request, response) {
   }
 }
 
+async function handleSearch(request, response) {
+  try {
+    const requestUrl = new URL(request.url || "/", `http://127.0.0.1:${port}`);
+    let query = requestUrl.searchParams.get("q") || "";
+    let maxResults = Number(requestUrl.searchParams.get("limit")) || 30;
+
+    if (request.method === "POST") {
+      const body = await readBody(request);
+      const data = JSON.parse(body || "{}");
+      query = String(data.query || data.q || "");
+
+      if (Number.isFinite(Number(data.limit))) {
+        maxResults = Number(data.limit);
+      }
+    }
+
+    if (!query.trim()) {
+      sendJson(response, { ok: false, error: "Enter something to search for." }, 400);
+      return;
+    }
+
+    const result = await searchYoutubeRequest({ query, maxResults });
+    sendJson(response, { ok: true, ...result });
+  } catch (error) {
+    sendJson(
+      response,
+      { ok: false, error: error instanceof Error ? error.message : "Unable to search YouTube." },
+      422
+    );
+  }
+}
+
 function getFilePath(urlPath) {
   const cleanPath = urlPath === "/" ? "/index.html" : decodeURIComponent(urlPath);
   const resolved = normalize(join(root, cleanPath));
@@ -82,6 +115,11 @@ createServer(async (request, response) => {
 
   if (requestUrl.pathname === "/api/resolve-youtube") {
     await handleApi(request, response);
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/search-youtube") {
+    await handleSearch(request, response);
     return;
   }
 
