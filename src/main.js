@@ -294,6 +294,13 @@ function bindEvents() {
         loadSource(url, { play: true });
       }
     });
+
+    // Listener for the "Save HQ as playlist" CTA button (event delegated on the same container)
+    els.searchResults.addEventListener("click", (event) => {
+      const saveBtn = event.target.closest("[data-action='save-hq-playlist']");
+      if (!saveBtn) return;
+      saveHqResultsAsPlaylist();
+    });
   }
 
   els.volumeSlider.addEventListener("input", () => {
@@ -486,6 +493,66 @@ function bindMoreByArtistEvent() {
     }
     runHqArtistSearch(artist);
   });
+}
+
+function escapeHtml(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function saveHqResultsAsPlaylist() {
+  if (!state.searchHqMode || state.searchResults.length === 0) {
+    setStatus("Run an artist HQ search first.", true);
+    return;
+  }
+
+  const artist = state.searchQuery;
+  const tracks = state.searchResults.map((result, index) =>
+    normalizeTrack(
+      {
+        videoId: result.videoId,
+        title: result.title,
+        channel: result.channel || artist,
+        durationText: result.durationText || "",
+        thumbnail: result.thumbnail || thumbnailFor(result.videoId),
+        url: `https://www.youtube.com/watch?v=${result.videoId}`,
+        source: "hq-collection"
+      },
+      index
+    )
+  );
+
+  const playlistId = `hq-${artist.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36)}`;
+  const libraryItem = {
+    id: playlistId,
+    title: `${artist} – HQ Collection`,
+    type: "hq-playlist",
+    listId: "",
+    videoId: tracks[0]?.videoId || "",
+    watchUrl: `https://www.youtube.com/watch?v=${tracks[0]?.videoId || ""}`,
+    importedAt: new Date().toISOString(),
+    tracks
+  };
+
+  // Replace any existing HQ playlist for this artist (newest version wins)
+  const existingArtistKey = `${artist.toLowerCase()} – hq collection`;
+  state.library = [
+    libraryItem,
+    ...state.library.filter((item) => String(item.title || "").toLowerCase() !== existingArtistKey)
+  ].slice(0, MAX_LIBRARY_ITEMS);
+
+  saveState();
+  renderLibrary();
+  renderStats();
+
+  setStatus(`✓ Saved "${artist} – HQ Collection" with ${tracks.length} videos to your Mixes library.`);
+
+  // Scroll the library panel into view so user sees the new playlist
+  els.mixLibrary.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function runHqArtistSearch(artist) {
@@ -1235,6 +1302,22 @@ function renderSearch() {
     els.searchStatus.textContent = `💎 ${state.searchResults.length} HIGH-QUALITY videos by ${state.searchQuery} (filtered ${stats.candidates || 0} candidates from ${stats.queriesRun || 0} parallel searches — only official channels, high-view-count, and verified versions kept). Click "Play as Mix" on any to load YouTube's Mix starting from that song.`;
   } else {
     els.searchStatus.textContent = `${state.searchResults.length} results for "${state.searchQuery}". Click "Play as Mix" to load YouTube's auto-generated Mix from any song.`;
+  }
+
+  // HQ mode: insert a prominent "Save as playlist" CTA at the top of results
+  if (state.searchHqMode && state.searchResults.length > 0) {
+    const cta = document.createElement("div");
+    cta.className = "hq-save-cta";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "hq-save-button";
+    button.dataset.action = "save-hq-playlist";
+    button.innerHTML = `💎 Save all ${state.searchResults.length} as "<strong>${escapeHtml(state.searchQuery)} - HQ Collection</strong>" playlist`;
+    const hint = document.createElement("p");
+    hint.className = "hq-save-hint";
+    hint.textContent = "Saves to your Mixes library. You can preview, play, or remove it just like any other mix.";
+    cta.append(button, hint);
+    fragment.append(cta);
   }
 
   for (const result of state.searchResults) {

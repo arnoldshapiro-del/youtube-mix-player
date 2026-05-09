@@ -398,6 +398,47 @@ img {
   color: #93c5fd;
 }
 
+.hq-save-cta {
+  grid-column: 1 / -1;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.15), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  border-radius: 10px;
+}
+
+.hq-save-button {
+  width: 100%;
+  background: linear-gradient(90deg, #facc15, #f59e0b);
+  color: #1a1500;
+  border: 0;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s;
+}
+
+.hq-save-button:hover {
+  box-shadow: 0 4px 16px rgba(250, 204, 21, 0.35);
+}
+
+.hq-save-button:active {
+  transform: scale(0.98);
+}
+
+.hq-save-button strong {
+  font-weight: 800;
+}
+
+.hq-save-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .search-card-actions {
   display: flex;
   gap: 6px;
