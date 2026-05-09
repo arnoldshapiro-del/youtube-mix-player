@@ -1,0 +1,16 @@
+{
+  "name": "YouTube Mix Player",
+  "short_name": "Mix Player",
+  "description": "A fast YouTube Mix and playlist player with queue, shuffle, casting helpers, and TV mode.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#f5533d",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230b0d12'/%3E%3Cpath fill='%23f5533d' d='M51 64c0-10 8-18 18-18h54c10 0 18 8 18 18v64c0 10-8 18-18 18H69c-10 0-18-8-18-18z'/%3E%3Cpath fill='white' d='m86 78 34 18-34 18z'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

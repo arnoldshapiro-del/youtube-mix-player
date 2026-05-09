@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A YouTube Mix and playlist player with queue thumbnails, shuffle, repeat, casting helpers, and TV mode."
+    />
+    <meta name="theme-color" content="#f5533d" />
+    <title>YouTube Mix Player</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="YouTube Mix Player home">
+          <span class="brand-badge" aria-hidden="true"></span>
+          <span>
+            <span class="eyebrow">Mix deck</span>
+            <span class="brand-name">YouTube Mix Player</span>
+          </span>
+        </a>
+
+        <form id="import-form" class="import-form">
+          <label class="sr-only" for="youtube-url">YouTube URL</label>
+          <input
+            id="youtube-url"
+            name="youtube-url"
+            type="url"
+            inputmode="url"
+            autocomplete="url"
+            spellcheck="false"
+            placeholder="Paste YouTube Mix, playlist, or video URL"
+          />
+          <button class="primary-button" type="submit">Load</button>
+        </form>
+
+        <div class="top-actions">
+          <button id="install-button" class="small-button" type="button" hidden>Install</button>
+          <button id="tv-mode-button" class="small-button" type="button" aria-pressed="false">TV</button>
+          <button id="cast-button" class="small-button" type="button">Cast</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <section class="player-column" aria-label="Player">
+          <div class="video-shell">
+            <div id="player" class="player"></div>
+            <div id="player-cover" class="player-cover">
+              <img id="cover-image" alt="" />
+              <div>
+                <p class="eyebrow">Ready</p>
+                <p id="cover-title">Load a YouTube Mix</p>
+              </div>
+            </div>
+          </div>
+
+          <section class="now-playing" aria-live="polite">
+            <p id="status-line" class="status-line">Waiting for the player</p>
+            <h1 id="track-title">YouTube Mix Player</h1>
+            <p id="track-meta">Your imported mixes stay on this device.</p>
+          </section>
+
+          <section class="timeline" aria-label="Playback progress">
+            <label class="sr-only" for="seek-slider">Seek</label>
+            <input id="seek-slider" type="range" min="0" max="1000" value="0" />
+            <div class="time-row">
+              <span id="elapsed-time">0:00</span>
+              <span id="duration-time">0:00</span>
+            </div>
+          </section>
+
+          <section class="transport" aria-label="Playback controls">
+            <button id="previous-button" type="button">Prev</button>
+            <button id="rewind-button" type="button">-10</button>
+            <button id="play-button" class="play-button" type="button">Play</button>
+            <button id="forward-button" type="button">+10</button>
+            <button id="next-button" type="button">Next</button>
+          </section>
+
+          <section class="mode-row" aria-label="Playback modes">
+            <button id="shuffle-button" type="button" aria-pressed="false">Shuffle</button>
+            <button id="repeat-button" type="button" data-repeat="all">Repeat all</button>
+            <label class="field compact-field">
+              <span>Speed</span>
+              <select id="speed-select">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+              </select>
+            </label>
+            <label class="field volume-field">
+              <span>Volume</span>
+              <input id="volume-slider" type="range" min="0" max="100" value="82" />
+            </label>
+          </section>
+        </section>
+
+        <aside class="queue-column" aria-label="Queue">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Now queued</p>
+              <h2>Videos</h2>
+            </div>
+            <span id="queue-count" class="count-pill">0</span>
+          </div>
+
+          <div class="queue-tools">
+            <label class="sr-only" for="queue-search">Search queue</label>
+            <input id="queue-search" type="search" placeholder="Search this mix" autocomplete="off" />
+            <button id="favorites-filter" type="button" aria-pressed="false">Saved</button>
+          </div>
+
+          <ol id="queue-list" class="queue-list"></ol>
+        </aside>
+
+        <aside class="mix-column" aria-label="Mix library">
+          <section class="library-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Imported</p>
+                <h2>Mixes</h2>
+              </div>
+              <button id="copy-link-button" type="button">Copy link</button>
+            </div>
+            <div id="mix-library" class="mix-library"></div>
+          </section>
+
+          <section class="session-panel">
+            <p class="eyebrow">Session</p>
+            <div class="stats">
+              <div>
+                <strong id="played-count">0</strong>
+                <span>Played</span>
+              </div>
+              <div>
+                <strong id="saved-count">0</strong>
+                <span>Saved</span>
+              </div>
+              <div>
+                <strong id="mix-count">0</strong>
+                <span>Mixes</span>
+              </div>
+            </div>
+            <button id="open-youtube-button" type="button">Open on YouTube</button>
+            <button id="clear-played-button" type="button">Clear played</button>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <dialog id="cast-dialog" class="cast-dialog">
+      <form method="dialog">
+        <button class="dialog-close" type="submit">Close</button>
+      </form>
+      <p class="eyebrow">Cast</p>
+      <h2>TV and laptop playback</h2>
+      <div class="cast-actions">
+        <button id="fullscreen-button" type="button">Fullscreen</button>
+        <button id="copy-tv-link-button" type="button">Copy TV link</button>
+        <button id="youtube-cast-button" type="button">YouTube cast</button>
+      </div>
+      <p id="cast-status" class="muted">
+        Use Chrome or Edge tab casting for this app, or open the current mix on YouTube for native YouTube casting.
+      </p>
+    </dialog>
+
+    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" async></script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
