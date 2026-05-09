@@ -466,6 +466,7 @@ function bindLyricsEvents() {
     state.lyricsOpen = !state.lyricsOpen;
     els.lyricsToggle.setAttribute("aria-pressed", String(state.lyricsOpen));
     els.lyricsPanel.hidden = !state.lyricsOpen;
+    document.body.classList.toggle("lyrics-open", state.lyricsOpen);
     if (state.lyricsOpen) {
       ensureLyricsLoaded();
     }
@@ -474,6 +475,7 @@ function bindLyricsEvents() {
     state.lyricsOpen = false;
     els.lyricsToggle.setAttribute("aria-pressed", "false");
     els.lyricsPanel.hidden = true;
+    document.body.classList.remove("lyrics-open");
   });
 }
 
