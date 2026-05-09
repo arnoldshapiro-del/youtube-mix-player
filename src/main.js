@@ -37,13 +37,25 @@ const state = {
   quality: DEFAULT_QUALITY,
   searchQuery: "",
   searchResults: [],
-  searching: false
+  searching: false,
+  recentlyPlayed: [],
+  sleepTimer: { mode: null, endTime: 0 },
+  lyricsOpen: false,
+  lyrics: { fetchedKey: "", lines: [], synced: false, plain: "" },
+  preMuteVolume: 82
 };
+
+const RECENT_HISTORY_LIMIT = 12;
 
 let player = null;
 let progressTimer = 0;
 let deferredInstallPrompt = null;
 let wakeLock = null;
+let sleepTimerTimeoutId = 0;
+let sleepTimerCountdownId = 0;
+let lyricsAbortController = null;
+let lyricsScrollTimer = 0;
+let pipWindow = null;
 
 const els = {};
 
@@ -101,7 +113,20 @@ function bindElements() {
     searchResults: document.querySelector("#search-results"),
     searchStatus: document.querySelector("#search-status"),
     starterPackButton: document.querySelector("#starter-pack-button"),
-    starterPackStatus: document.querySelector("#starter-pack-status")
+    starterPackStatus: document.querySelector("#starter-pack-status"),
+    lyricsToggle: document.querySelector("#lyrics-toggle"),
+    lyricsPanel: document.querySelector("#lyrics-panel"),
+    lyricsBody: document.querySelector("#lyrics-body"),
+    lyricsStatus: document.querySelector("#lyrics-status"),
+    lyricsClose: document.querySelector("#lyrics-close"),
+    moreByArtistButton: document.querySelector("#more-by-artist"),
+    shareTimeButton: document.querySelector("#share-time"),
+    pipButton: document.querySelector("#pip-button"),
+    sleepTimerButton: document.querySelector("#sleep-timer-button"),
+    sleepTimerLabel: document.querySelector("#sleep-timer-label"),
+    sleepTimerMenu: document.querySelector("#sleep-timer-menu"),
+    keyboardHelpButton: document.querySelector("#keyboard-help"),
+    shortcutsDialog: document.querySelector("#shortcuts-dialog")
   });
 }
 
@@ -411,6 +436,104 @@ function bindEvents() {
       updateProgress();
     }
   });
+
+  bindLyricsEvents();
+  bindMoreByArtistEvent();
+  bindShareTimeEvent();
+  bindPipEvent();
+  bindSleepTimerEvents();
+  bindShortcutsHelpEvent();
+}
+
+function bindLyricsEvents() {
+  if (!els.lyricsToggle) return;
+  els.lyricsToggle.addEventListener("click", () => {
+    state.lyricsOpen = !state.lyricsOpen;
+    els.lyricsToggle.setAttribute("aria-pressed", String(state.lyricsOpen));
+    els.lyricsPanel.hidden = !state.lyricsOpen;
+    if (state.lyricsOpen) {
+      ensureLyricsLoaded();
+    }
+  });
+  els.lyricsClose?.addEventListener("click", () => {
+    state.lyricsOpen = false;
+    els.lyricsToggle.setAttribute("aria-pressed", "false");
+    els.lyricsPanel.hidden = true;
+  });
+}
+
+function bindMoreByArtistEvent() {
+  if (!els.moreByArtistButton) return;
+  els.moreByArtistButton.addEventListener("click", () => {
+    const track = state.tracks[state.currentIndex];
+    if (!track) return;
+    const { artist } = parseTrackTitle(track.title, track.channel);
+    if (!artist) {
+      setStatus("Could not detect the artist of this track.", true);
+      return;
+    }
+    if (els.searchInput) {
+      els.searchInput.value = artist;
+      runSearch(artist);
+      els.searchInput.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+}
+
+function bindShareTimeEvent() {
+  if (!els.shareTimeButton) return;
+  els.shareTimeButton.addEventListener("click", () => {
+    const url = new URL(window.location.href);
+    url.search = "";
+    const t = Math.floor(getCurrentTime());
+    const track = state.tracks[state.currentIndex];
+    if (track?.videoId) {
+      url.searchParams.set("source", `https://www.youtube.com/watch?v=${track.videoId}${state.source?.listId ? `&list=${state.source.listId}` : ""}`);
+    } else if (state.source?.watchUrl) {
+      url.searchParams.set("source", state.source.watchUrl);
+    }
+    if (t > 0) url.searchParams.set("t", String(t));
+    copyText(url.toString(), `Link copied — starts at ${formatTime(t)}.`);
+  });
+}
+
+function bindPipEvent() {
+  if (!els.pipButton) return;
+  els.pipButton.addEventListener("click", togglePictureInPicture);
+}
+
+function bindSleepTimerEvents() {
+  if (!els.sleepTimerButton) return;
+  els.sleepTimerButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const expanded = els.sleepTimerButton.getAttribute("aria-expanded") === "true";
+    els.sleepTimerButton.setAttribute("aria-expanded", String(!expanded));
+    els.sleepTimerMenu.hidden = expanded;
+  });
+
+  els.sleepTimerMenu?.addEventListener("click", (event) => {
+    const target = event.target.closest("button[data-sleep]");
+    if (!target) return;
+    const value = target.dataset.sleep;
+    setSleepTimer(value);
+    els.sleepTimerMenu.hidden = true;
+    els.sleepTimerButton.setAttribute("aria-expanded", "false");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!els.sleepTimerMenu) return;
+    if (els.sleepTimerMenu.hidden) return;
+    if (event.target.closest(".sleep-timer-wrap")) return;
+    els.sleepTimerMenu.hidden = true;
+    els.sleepTimerButton?.setAttribute("aria-expanded", "false");
+  });
+}
+
+function bindShortcutsHelpEvent() {
+  if (!els.keyboardHelpButton) return;
+  els.keyboardHelpButton.addEventListener("click", () => {
+    els.shortcutsDialog?.showModal?.();
+  });
 }
 
 function handleKeydown(event) {
@@ -418,32 +541,117 @@ function handleKeydown(event) {
     return;
   }
 
-  if (event.code === "Space") {
+  if (event.target.closest("dialog[open]")) {
+    return;
+  }
+
+  const key = event.key;
+  const lower = typeof key === "string" ? key.toLowerCase() : "";
+
+  if (event.code === "Space" || lower === "k") {
     event.preventDefault();
     togglePlayback();
+    return;
   }
 
-  if (event.key === "ArrowRight") {
+  if (key === "ArrowRight" || lower === "l") {
+    event.preventDefault();
     seekBy(10);
+    return;
   }
 
-  if (event.key === "ArrowLeft") {
+  if (key === "ArrowLeft" || lower === "j") {
+    event.preventDefault();
     seekBy(-10);
+    return;
   }
 
-  if (event.key.toLowerCase() === "n") {
+  if (lower === "n") {
     nextTrack();
+    return;
   }
 
-  if (event.key.toLowerCase() === "b") {
+  if (lower === "b" || lower === "p") {
     previousTrack();
+    return;
   }
+
+  if (lower === "f") {
+    event.preventDefault();
+    togglePlayerFullscreen();
+    return;
+  }
+
+  if (lower === "m") {
+    event.preventDefault();
+    toggleMute();
+    return;
+  }
+
+  if (lower === "s") {
+    event.preventDefault();
+    els.shuffleButton.click();
+    return;
+  }
+
+  if (lower === "r") {
+    event.preventDefault();
+    els.repeatButton.click();
+    return;
+  }
+
+  if (key >= "0" && key <= "9") {
+    event.preventDefault();
+    const fraction = Number(key) / 10;
+    const duration = getDuration();
+    if (duration > 0 && player?.seekTo) {
+      player.seekTo(duration * fraction, true);
+      updateProgress();
+    }
+    return;
+  }
+
+  if (key === "?" || (event.shiftKey && key === "/")) {
+    event.preventDefault();
+    els.shortcutsDialog?.showModal?.();
+    return;
+  }
+}
+
+function togglePlayerFullscreen() {
+  if (!els.videoShell) return;
+  const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (isFs) {
+    (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+  } else {
+    (els.videoShell.requestFullscreen || els.videoShell.webkitRequestFullscreen)?.call(els.videoShell);
+  }
+}
+
+function toggleMute() {
+  if (!player) return;
+  const isMuted = player.isMuted?.() ?? false;
+  if (isMuted) {
+    player.unMute?.();
+    if (state.preMuteVolume > 0) {
+      player.setVolume?.(state.preMuteVolume);
+      els.volumeSlider.value = String(state.preMuteVolume);
+      state.volume = state.preMuteVolume;
+    }
+    setStatus("Unmuted");
+  } else {
+    state.preMuteVolume = state.volume;
+    player.mute?.();
+    setStatus("Muted (press M to unmute)");
+  }
+  saveState();
 }
 
 async function loadInitialSource() {
   const params = new URLSearchParams(window.location.search);
   const sharedIds = params.get("ids");
   const sharedSource = params.get("source");
+  const startTime = Number(params.get("t") || 0);
 
   if (sharedIds) {
     const tracks = sharedIds
@@ -460,6 +668,7 @@ async function loadInitialSource() {
       play: false,
       nativeListMode: false
     });
+    if (startTime > 0) seekToWhenReady(startTime);
     return;
   }
 
@@ -467,12 +676,34 @@ async function loadInitialSource() {
 
   if (sharedSource) {
     await loadSource(sharedSource, { play: false });
+    if (startTime > 0) seekToWhenReady(startTime);
   } else if (savedMix) {
     loadLibraryMix(savedMix.id, { play: false });
   } else {
     els.youtubeUrl.value = STARTER_URL;
     await loadSource(STARTER_URL, { play: false });
   }
+}
+
+function seekToWhenReady(seconds) {
+  // Wait for player to be ready, then seek
+  const tryNow = () => {
+    if (player?.seekTo && getDuration() > 0) {
+      player.seekTo(seconds, true);
+      setStatus(`Started at ${formatTime(seconds)} from shared link.`);
+      return true;
+    }
+    return false;
+  };
+  if (tryNow()) return;
+
+  let attempts = 0;
+  const interval = window.setInterval(() => {
+    attempts += 1;
+    if (tryNow() || attempts > 20) {
+      window.clearInterval(interval);
+    }
+  }, 500);
 }
 
 async function loadSource(rawUrl, { play = false } = {}) {
@@ -623,6 +854,7 @@ function playAt(index, { play = true } = {}) {
   }
 
   state.currentIndex = index;
+  rememberRecent(state.tracks[index].videoId);
 
   if (state.nativeListMode) {
     if (!state.nativeListLoaded) {
@@ -638,6 +870,15 @@ function playAt(index, { play = true } = {}) {
 
   renderAll();
   updateMediaSession();
+
+  if (state.lyricsOpen) {
+    ensureLyricsLoaded();
+  }
+}
+
+function rememberRecent(videoId) {
+  if (!videoId) return;
+  state.recentlyPlayed = [videoId, ...state.recentlyPlayed.filter((id) => id !== videoId)].slice(0, RECENT_HISTORY_LIMIT);
 }
 
 function loadNativeList({ play = false } = {}) {
@@ -723,6 +964,18 @@ function getNextIndex() {
   }
 
   if (state.shuffle) {
+    // Smart shuffle: prefer tracks not in recentlyPlayed
+    const recent = new Set(state.recentlyPlayed);
+    const candidates = state.tracks
+      .map((track, idx) => ({ track, idx }))
+      .filter(({ idx, track }) => idx !== state.currentIndex && !recent.has(track.videoId));
+
+    if (candidates.length > 0) {
+      const choice = candidates[Math.floor(Math.random() * candidates.length)];
+      return choice.idx;
+    }
+
+    // All tracks played recently — fall back to standard shuffle
     if (state.shuffleOrder.length <= 1) {
       state.shuffleOrder = shuffledIndexes(state.tracks.length, state.currentIndex);
     }
@@ -1014,6 +1267,14 @@ function onPlayerStateChange(event) {
       saveState();
     }
 
+    // End-of-track sleep timer
+    if (state.sleepTimer.mode === "end-of-track") {
+      state.sleepTimer = { mode: null, endTime: 0 };
+      updateSleepTimerLabel();
+      setStatus("Sleep timer fired — playback stopped after this song.");
+      return;
+    }
+
     if (!state.nativeListMode) {
       nextTrack();
     }
@@ -1092,6 +1353,10 @@ function updateProgress() {
 
   els.elapsedTime.textContent = formatTime(current);
   els.durationTime.textContent = formatTime(duration);
+
+  if (state.lyricsOpen) {
+    syncLyricsToPlayback();
+  }
 }
 
 function renderAll() {
@@ -1371,6 +1636,331 @@ async function releaseWakeLock() {
   }
 
   wakeLock = null;
+}
+
+function setSleepTimer(value) {
+  clearSleepTimer();
+
+  if (value === "off" || value === null) {
+    state.sleepTimer = { mode: null, endTime: 0 };
+    setStatus("Sleep timer cancelled.");
+    updateSleepTimerLabel();
+    return;
+  }
+
+  if (value === "end-of-track") {
+    state.sleepTimer = { mode: "end-of-track", endTime: 0 };
+    setStatus("Sleep timer set: stops after this song ends.");
+    updateSleepTimerLabel();
+    return;
+  }
+
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) return;
+
+  const endTime = Date.now() + minutes * 60 * 1000;
+  state.sleepTimer = { mode: "minutes", endTime };
+
+  sleepTimerTimeoutId = window.setTimeout(() => {
+    player?.pauseVideo?.();
+    state.sleepTimer = { mode: null, endTime: 0 };
+    setStatus("Sleep timer fired — playback paused.");
+    updateSleepTimerLabel();
+  }, minutes * 60 * 1000);
+
+  sleepTimerCountdownId = window.setInterval(updateSleepTimerLabel, 30000);
+
+  updateSleepTimerLabel();
+  setStatus(`Sleep timer set for ${minutes} minute${minutes === 1 ? "" : "s"}.`);
+}
+
+function clearSleepTimer() {
+  if (sleepTimerTimeoutId) {
+    window.clearTimeout(sleepTimerTimeoutId);
+    sleepTimerTimeoutId = 0;
+  }
+  if (sleepTimerCountdownId) {
+    window.clearInterval(sleepTimerCountdownId);
+    sleepTimerCountdownId = 0;
+  }
+}
+
+function updateSleepTimerLabel() {
+  if (!els.sleepTimerLabel || !els.sleepTimerButton) return;
+
+  if (state.sleepTimer.mode === "minutes") {
+    const remainingMs = state.sleepTimer.endTime - Date.now();
+    if (remainingMs <= 0) {
+      els.sleepTimerLabel.textContent = "Sleep timer";
+      els.sleepTimerButton.classList.remove("is-active");
+      return;
+    }
+    const minutes = Math.max(1, Math.ceil(remainingMs / 60000));
+    els.sleepTimerLabel.textContent = `Sleeps in ${minutes}m`;
+    els.sleepTimerButton.classList.add("is-active");
+    return;
+  }
+
+  if (state.sleepTimer.mode === "end-of-track") {
+    els.sleepTimerLabel.textContent = "Sleeps after song";
+    els.sleepTimerButton.classList.add("is-active");
+    return;
+  }
+
+  els.sleepTimerLabel.textContent = "Sleep timer";
+  els.sleepTimerButton.classList.remove("is-active");
+}
+
+async function togglePictureInPicture() {
+  try {
+    if (pipWindow && !pipWindow.closed) {
+      pipWindow.close();
+      pipWindow = null;
+      els.pipButton.classList.remove("is-active");
+      return;
+    }
+
+    if (!("documentPictureInPicture" in window)) {
+      // Try the iframe element directly (works in some browsers)
+      const iframe = els.videoShell?.querySelector("iframe");
+      if (iframe?.requestPictureInPicture) {
+        await iframe.requestPictureInPicture();
+        els.pipButton.classList.add("is-active");
+        return;
+      }
+      setStatus("Picture-in-Picture is not available in this browser. Try Chrome or Edge.", true);
+      return;
+    }
+
+    const playerEl = document.getElementById("player");
+    if (!playerEl) return;
+
+    const placeholder = document.createElement("div");
+    placeholder.id = "pip-placeholder";
+    playerEl.parentNode.insertBefore(placeholder, playerEl);
+
+    pipWindow = await window.documentPictureInPicture.requestWindow({
+      width: 480,
+      height: 270
+    });
+
+    // Copy stylesheets so the PiP window has the same styles for the iframe
+    [...document.styleSheets].forEach((sheet) => {
+      try {
+        const cssText = [...sheet.cssRules].map((r) => r.cssText).join("\n");
+        const styleEl = document.createElement("style");
+        styleEl.textContent = cssText;
+        pipWindow.document.head.appendChild(styleEl);
+      } catch {
+        // Cross-origin stylesheet — skip.
+      }
+    });
+
+    pipWindow.document.body.style.margin = "0";
+    pipWindow.document.body.style.background = "#000";
+    pipWindow.document.body.appendChild(playerEl);
+    playerEl.style.width = "100vw";
+    playerEl.style.height = "100vh";
+
+    els.pipButton.classList.add("is-active");
+
+    pipWindow.addEventListener("pagehide", () => {
+      const ph = document.getElementById("pip-placeholder");
+      if (ph) {
+        ph.parentNode.insertBefore(playerEl, ph);
+        ph.remove();
+      }
+      playerEl.style.width = "";
+      playerEl.style.height = "";
+      pipWindow = null;
+      els.pipButton.classList.remove("is-active");
+    });
+  } catch (error) {
+    setStatus("Could not start mini player: " + (error?.message || "unknown error"), true);
+  }
+}
+
+function parseTrackTitle(rawTitle, channel) {
+  // YouTube titles often look like "Artist - Song Title (Official Video)"
+  const cleaned = String(rawTitle || "")
+    .replace(/\s*[\[(](?:official|video|hd|4k|live|audio|lyrics?|mv|mix|remaster(?:ed)?|with lyrics|hq|m\/v).*?[\])]/gi, "")
+    .replace(/\s+\|\s+.*$/, "")
+    .replace(/\s+-\s+topic\s*$/i, "")
+    .trim();
+
+  let artist = "";
+  let title = cleaned;
+
+  const dashSplit = cleaned.split(/\s+[-–—]\s+/);
+  if (dashSplit.length >= 2) {
+    artist = dashSplit[0].trim();
+    title = dashSplit.slice(1).join(" - ").trim();
+  } else if (channel) {
+    artist = String(channel).replace(/\s+-\s+topic\s*$/i, "").replace(/vevo$/i, "").trim();
+  }
+
+  // Clean leftover trailing junk in title
+  title = title
+    .replace(/\s*\(.*?\)\s*$/g, "")
+    .replace(/\s*\[.*?\]\s*$/g, "")
+    .trim();
+
+  return { artist, title };
+}
+
+async function ensureLyricsLoaded() {
+  if (!els.lyricsBody) return;
+  const track = state.tracks[state.currentIndex];
+  if (!track) {
+    els.lyricsBody.replaceChildren();
+    els.lyricsStatus.textContent = "Play a song to see lyrics.";
+    return;
+  }
+
+  const { artist, title } = parseTrackTitle(track.title, track.channel);
+  const key = `${artist}::${title}`;
+
+  if (state.lyrics.fetchedKey === key && state.lyrics.lines.length > 0) {
+    renderLyrics();
+    return;
+  }
+
+  if (lyricsAbortController) {
+    lyricsAbortController.abort();
+  }
+
+  lyricsAbortController = new AbortController();
+  els.lyricsStatus.textContent = `Looking up lyrics for "${title}" by ${artist || "unknown artist"}...`;
+  els.lyricsBody.replaceChildren();
+  state.lyrics = { fetchedKey: key, lines: [], synced: false, plain: "" };
+
+  try {
+    const params = new URLSearchParams();
+    if (artist) params.set("artist_name", artist);
+    if (title) params.set("track_name", title);
+    const response = await fetch(`https://lrclib.net/api/get?${params.toString()}`, {
+      signal: lyricsAbortController.signal
+    });
+
+    if (!response.ok) {
+      // Try the search endpoint as a fallback
+      const searchParams = new URLSearchParams({ q: `${artist} ${title}`.trim() });
+      const searchResponse = await fetch(`https://lrclib.net/api/search?${searchParams.toString()}`, {
+        signal: lyricsAbortController.signal
+      });
+      const searchData = await searchResponse.json();
+      const best = Array.isArray(searchData) ? searchData[0] : null;
+      if (!best) {
+        els.lyricsStatus.textContent = `No lyrics found for "${title}". Try a different song.`;
+        return;
+      }
+      handleLyricsPayload(best, key);
+      return;
+    }
+
+    const data = await response.json();
+    handleLyricsPayload(data, key);
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    els.lyricsStatus.textContent = "Could not load lyrics — check your connection.";
+  }
+}
+
+function handleLyricsPayload(data, key) {
+  if (!data || (!data.syncedLyrics && !data.plainLyrics)) {
+    els.lyricsStatus.textContent = "No lyrics available for this song.";
+    return;
+  }
+
+  if (data.syncedLyrics) {
+    const lines = parseLrc(data.syncedLyrics);
+    state.lyrics = { fetchedKey: key, lines, synced: true, plain: data.plainLyrics || "" };
+    els.lyricsStatus.textContent = `Synced lyrics — ${data.artistName || ""} • ${data.trackName || ""}`;
+  } else {
+    state.lyrics = { fetchedKey: key, lines: [], synced: false, plain: data.plainLyrics || "" };
+    els.lyricsStatus.textContent = `Lyrics (not synced) — ${data.artistName || ""} • ${data.trackName || ""}`;
+  }
+
+  renderLyrics();
+}
+
+function parseLrc(text) {
+  const lines = [];
+  const lrcRegex = /\[(\d+):(\d+)(?:\.(\d+))?\]/g;
+  for (const rawLine of String(text).split(/\r?\n/)) {
+    const matches = [...rawLine.matchAll(lrcRegex)];
+    if (matches.length === 0) continue;
+    const lyric = rawLine.replace(lrcRegex, "").trim();
+    for (const match of matches) {
+      const minutes = Number(match[1]);
+      const seconds = Number(match[2]);
+      const fractional = match[3] ? Number(`0.${match[3]}`) : 0;
+      const time = minutes * 60 + seconds + fractional;
+      lines.push({ time, text: lyric });
+    }
+  }
+  lines.sort((a, b) => a.time - b.time);
+  return lines;
+}
+
+function renderLyrics() {
+  if (!els.lyricsBody) return;
+  els.lyricsBody.replaceChildren();
+
+  if (state.lyrics.synced && state.lyrics.lines.length > 0) {
+    els.lyricsBody.classList.remove("plain");
+    const fragment = document.createDocumentFragment();
+    state.lyrics.lines.forEach((line, index) => {
+      const p = document.createElement("p");
+      p.dataset.index = String(index);
+      p.dataset.time = String(line.time);
+      p.textContent = line.text || "♪";
+      fragment.append(p);
+    });
+    els.lyricsBody.append(fragment);
+    return;
+  }
+
+  if (state.lyrics.plain) {
+    els.lyricsBody.classList.add("plain");
+    const fragment = document.createDocumentFragment();
+    for (const line of state.lyrics.plain.split(/\r?\n/)) {
+      const p = document.createElement("p");
+      p.textContent = line.trim() || " ";
+      fragment.append(p);
+    }
+    els.lyricsBody.append(fragment);
+  }
+}
+
+function syncLyricsToPlayback() {
+  if (!state.lyricsOpen || !state.lyrics.synced || state.lyrics.lines.length === 0) return;
+  const t = getCurrentTime();
+  const lines = state.lyrics.lines;
+
+  let activeIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].time <= t) {
+      activeIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  const paragraphs = els.lyricsBody.children;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    p.classList.toggle("is-active", i === activeIndex);
+    p.classList.toggle("is-past", i < activeIndex);
+  }
+
+  if (activeIndex >= 0 && activeIndex !== Number(els.lyricsBody.dataset.lastActive || -1)) {
+    els.lyricsBody.dataset.lastActive = String(activeIndex);
+    const activeP = paragraphs[activeIndex];
+    if (activeP) {
+      activeP.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
 }
 
 function setupCastFlag() {

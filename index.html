@@ -89,7 +89,66 @@
             <p id="status-line" class="status-line">Waiting for the player</p>
             <h1 id="track-title">YouTube Mix Player</h1>
             <p id="track-meta">Your imported mixes stay on this device.</p>
+            <div class="track-actions">
+              <button id="lyrics-toggle" class="track-action-button" type="button" aria-pressed="false">
+                <span aria-hidden="true">🎤</span> Lyrics
+              </button>
+              <button id="more-by-artist" class="track-action-button" type="button">
+                <span aria-hidden="true">🎸</span> More by artist
+              </button>
+              <button id="share-time" class="track-action-button" type="button">
+                <span aria-hidden="true">⏱</span> Share at time
+              </button>
+              <button id="pip-button" class="track-action-button" type="button">
+                <span aria-hidden="true">⧉</span> Mini player
+              </button>
+              <div class="sleep-timer-wrap">
+                <button id="sleep-timer-button" class="track-action-button" type="button" aria-haspopup="true" aria-expanded="false">
+                  <span aria-hidden="true">🌙</span> <span id="sleep-timer-label">Sleep timer</span>
+                </button>
+                <div id="sleep-timer-menu" class="sleep-timer-menu" hidden>
+                  <button type="button" data-sleep="15">15 minutes</button>
+                  <button type="button" data-sleep="30">30 minutes</button>
+                  <button type="button" data-sleep="45">45 minutes</button>
+                  <button type="button" data-sleep="60">1 hour</button>
+                  <button type="button" data-sleep="end-of-track">End of song</button>
+                  <button type="button" data-sleep="off">Cancel timer</button>
+                </div>
+              </div>
+              <button id="keyboard-help" class="track-action-button" type="button" aria-label="Keyboard shortcuts">
+                <span aria-hidden="true">⌨</span> Shortcuts
+              </button>
+            </div>
           </section>
+
+          <section id="lyrics-panel" class="lyrics-panel" hidden aria-label="Synced lyrics">
+            <div class="lyrics-header">
+              <strong>Lyrics</strong>
+              <span id="lyrics-status" class="lyrics-status muted"></span>
+              <button id="lyrics-close" class="lyrics-close" type="button" aria-label="Close lyrics">✕</button>
+            </div>
+            <div id="lyrics-body" class="lyrics-body"></div>
+          </section>
+
+          <dialog id="shortcuts-dialog" class="shortcuts-dialog">
+            <form method="dialog">
+              <button class="dialog-close" type="submit">Close</button>
+            </form>
+            <h2>Keyboard shortcuts</h2>
+            <ul class="shortcuts-list">
+              <li><kbd>Space</kbd> or <kbd>K</kbd> — Play / pause</li>
+              <li><kbd>←</kbd> or <kbd>J</kbd> — Back 10 seconds</li>
+              <li><kbd>→</kbd> or <kbd>L</kbd> — Forward 10 seconds</li>
+              <li><kbd>N</kbd> — Next track</li>
+              <li><kbd>B</kbd> or <kbd>P</kbd> — Previous track</li>
+              <li><kbd>F</kbd> — Toggle fullscreen</li>
+              <li><kbd>M</kbd> — Mute / unmute</li>
+              <li><kbd>S</kbd> — Toggle shuffle</li>
+              <li><kbd>R</kbd> — Cycle repeat mode</li>
+              <li><kbd>0</kbd>–<kbd>9</kbd> — Jump to 0%–90%</li>
+              <li><kbd>?</kbd> — Show this help</li>
+            </ul>
+          </dialog>
 
           <section class="timeline" aria-label="Playback progress">
             <label class="sr-only" for="seek-slider">Seek</label>
