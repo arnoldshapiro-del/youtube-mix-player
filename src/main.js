@@ -51,6 +51,7 @@ function bindElements() {
   Object.assign(els, {
     importForm: document.querySelector("#import-form"),
     youtubeUrl: document.querySelector("#youtube-url"),
+    urlClear: document.querySelector("#url-clear"),
     installButton: document.querySelector("#install-button"),
     tvModeButton: document.querySelector("#tv-mode-button"),
     castButton: document.querySelector("#cast-button"),
@@ -86,6 +87,7 @@ function bindElements() {
     playedCount: document.querySelector("#played-count"),
     savedCount: document.querySelector("#saved-count"),
     mixCount: document.querySelector("#mix-count"),
+    mixLibraryCount: document.querySelector("#mix-library-count"),
     openYoutubeButton: document.querySelector("#open-youtube-button"),
     clearPlayedButton: document.querySelector("#clear-played-button"),
     qualitySelect: document.querySelector("#quality-select"),
@@ -206,6 +208,17 @@ function bindEvents() {
       }
 
       runSearch(query);
+    });
+  }
+
+  if (els.urlClear) {
+    els.youtubeUrl.addEventListener("input", () => {
+      els.urlClear.hidden = !els.youtubeUrl.value;
+    });
+    els.urlClear.addEventListener("click", () => {
+      els.youtubeUrl.value = "";
+      els.urlClear.hidden = true;
+      els.youtubeUrl.focus();
     });
   }
 
@@ -1229,6 +1242,7 @@ function renderStats() {
   els.playedCount.textContent = String(state.played.size);
   els.savedCount.textContent = String(state.favorites.size);
   els.mixCount.textContent = String(state.library.length);
+  els.mixLibraryCount.textContent = String(state.library.length);
 }
 
 function setStatus(message, isError = false) {

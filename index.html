@@ -25,15 +25,18 @@
 
         <form id="import-form" class="import-form">
           <label class="sr-only" for="youtube-url">YouTube URL</label>
-          <input
-            id="youtube-url"
-            name="youtube-url"
-            type="url"
-            inputmode="url"
-            autocomplete="url"
-            spellcheck="false"
-            placeholder="Paste YouTube Mix, playlist, or video URL"
-          />
+          <div class="url-field-wrap">
+            <input
+              id="youtube-url"
+              name="youtube-url"
+              type="url"
+              inputmode="url"
+              autocomplete="url"
+              spellcheck="false"
+              placeholder="Paste YouTube Mix, playlist, or video URL"
+            />
+            <button id="url-clear" class="input-clear-button" type="button" hidden aria-label="Clear URL">✕</button>
+          </div>
           <button class="primary-button" type="submit">Load</button>
         </form>
 
@@ -169,6 +172,7 @@
                 <p class="eyebrow">Imported</p>
                 <h2>Mixes</h2>
               </div>
+              <span id="mix-library-count" class="count-pill">0</span>
               <button id="copy-link-button" type="button">Copy link</button>
             </div>
             <div class="starter-pack-row">

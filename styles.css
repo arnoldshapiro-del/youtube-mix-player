@@ -198,6 +198,40 @@ img {
   gap: 10px;
 }
 
+.url-field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.url-field-wrap input {
+  width: 100%;
+  padding-right: 28px;
+}
+
+.input-clear-button {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-clear-button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
 .primary-button,
 .play-button {
   border-color: transparent;
