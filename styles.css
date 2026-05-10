@@ -540,17 +540,28 @@ img {
   grid-template-columns: minmax(640px, 2.6fr) minmax(280px, 0.7fr);
 }
 
+/* Phase 4 (May 11, 2026): Theater mode keeps the library visible BELOW the
+   player+queue row instead of hiding it entirely. Saved mixes + starter pack
+   + Load button all stay accessible in any size preset. */
 .size-theater .mix-column {
-  display: none;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr 1fr;
+  max-height: none;
 }
 
 .size-max .workspace {
   grid-template-columns: 1fr;
 }
 
+/* Phase 4: Max mode also keeps the queue + library visible. Player goes full
+   width on row 1; queue + library share row 2 in two equal columns. */
 .size-max .queue-column,
 .size-max .mix-column {
-  display: none;
+  grid-column: 1 / -1;
+  max-height: none;
+}
+.size-max .mix-column {
+  grid-template-columns: 1fr 1fr;
 }
 
 .size-max .player-column {
