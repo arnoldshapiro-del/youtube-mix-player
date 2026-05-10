@@ -284,7 +284,28 @@
       </p>
     </dialog>
 
+    <!-- Phase 4 (May 11, 2026): Firebase auth gate. Covers the entire app
+         until the user signs in with Google + email is on the
+         app_access/youtube-mix-player allowlist. Saved mixes sync to
+         Firestore so cookie clears can no longer wipe them. -->
+    <div id="auth-gate" class="auth-gate" hidden>
+      <div class="auth-gate-card">
+        <div class="auth-gate-icon">🎶</div>
+        <h2 class="auth-gate-title">YouTube Mix Player</h2>
+        <p class="auth-gate-subtitle">Sign in with your Google account to access the app and sync your saved mixes across devices.</p>
+        <button id="auth-gate-signin" class="auth-gate-button" type="button">Sign in with Google</button>
+        <div id="auth-gate-status" class="auth-gate-status"></div>
+      </div>
+    </div>
+
+    <!-- Phase 4: Sign-out + cloud sync indicator pinned to corner once authed. -->
+    <div id="auth-pill" class="auth-pill" hidden>
+      <span id="auth-pill-status" class="auth-pill-status">☁ synced</span>
+      <button id="auth-pill-signout" class="auth-pill-signout" type="button" title="Sign out">⏻</button>
+    </div>
+
     <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" async></script>
+    <script type="module" src="./src/authGate.js"></script>
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>

@@ -1531,3 +1531,100 @@ img {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Phase 4 (May 11, 2026): Firebase auth gate + signed-in pill ── */
+.auth-gate {
+  position: fixed; inset: 0; z-index: 99999;
+  background: linear-gradient(135deg, #0b0f1a 0%, #131726 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: authFade 0.25s ease-out;
+}
+@keyframes authFade { from { opacity: 0; } to { opacity: 1; } }
+.auth-gate[hidden] { display: none !important; }
+.auth-gate-card {
+  max-width: 460px; width: 100%;
+  background: #1a1f30;
+  color: #f0f3fb;
+  border: 1px solid rgba(245,83,61,0.45);
+  border-radius: 18px;
+  padding: 36px 28px 28px;
+  text-align: center;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+}
+.auth-gate-icon {
+  font-size: 44px; margin-bottom: 8px;
+}
+.auth-gate-title {
+  font-size: 24px; font-weight: 800; margin: 0 0 8px;
+  color: #f5533d;
+}
+.auth-gate-subtitle {
+  font-size: 14px; line-height: 1.5;
+  color: #b9c1d4; margin: 0 0 20px;
+}
+.auth-gate-button {
+  background: linear-gradient(90deg, #f5533d 0%, #e94328 100%);
+  color: #fff; font-weight: 700; font-size: 15px;
+  border: none; border-radius: 12px;
+  padding: 12px 22px; cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 14px rgba(245,83,61,0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.auth-gate-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(245,83,61,0.5);
+}
+.auth-gate-button:active:not(:disabled) { transform: translateY(1px) scale(0.98); }
+.auth-gate-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.auth-gate-status {
+  margin-top: 14px; font-size: 12px; line-height: 1.5;
+  color: #9ca6c0; min-height: 18px;
+}
+.auth-gate-status code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 6px; border-radius: 4px;
+  color: #f5533d;
+}
+
+.auth-pill {
+  position: fixed; top: 12px; right: 12px;
+  z-index: 99998;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(15,17,28,0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(245,83,61,0.25);
+  border-radius: 99px;
+  padding: 4px 6px 4px 12px;
+  font-size: 11px; color: #b9c1d4;
+}
+.auth-pill[hidden] { display: none !important; }
+.auth-pill-status { font-weight: 600; }
+.auth-pill-signout {
+  width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
+  color: #b9c1d4; cursor: pointer;
+  font-family: inherit; font-size: 12px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.auth-pill-signout:hover {
+  color: #fff; background: rgba(245,83,61,0.25);
+  border-color: rgba(245,83,61,0.6);
+}
+
+/* While auth check is pending, hide the app shell to avoid a flash of
+   unauthenticated content. authGate.js sets html[data-auth-gate]. */
+html[data-auth-gate="pending"] .app-shell,
+html[data-auth-gate="denied"] .app-shell {
+  visibility: hidden;
+}
+
+@media (max-width: 480px) {
+  .auth-gate-card { padding: 28px 20px 22px; }
+  .auth-gate-title { font-size: 20px; }
+  .auth-gate-subtitle { font-size: 13px; }
+  .auth-pill { top: 8px; right: 8px; padding: 3px 5px 3px 10px; font-size: 10px; }
+}

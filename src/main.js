@@ -8,6 +8,7 @@ import {
   thumbnailFor,
   youtubeWatchUrl
 } from "./youtubeTools.js";
+import { fetchUserState, saveUserState } from "./firebase.js";
 
 const STORAGE_KEY = "youtube-mix-player:v1";
 const MAX_LIBRARY_ITEMS = 18;
@@ -142,6 +143,13 @@ function loadSavedState() {
     saved = {};
   }
 
+  applyStateFromSaved(saved);
+}
+
+// Phase 4: pulled state-application out of loadSavedState so we can re-apply
+// it after Firestore returns its (typically more complete) copy.
+function applyStateFromSaved(saved) {
+  saved = saved || {};
   state.library = Array.isArray(saved.library) ? saved.library : [];
   state.favorites = new Set(Array.isArray(saved.favorites) ? saved.favorites : []);
   state.played = new Set(Array.isArray(saved.played) ? saved.played : []);
@@ -152,20 +160,71 @@ function loadSavedState() {
   state.quality = typeof saved.quality === "string" && saved.quality ? saved.quality : DEFAULT_QUALITY;
 }
 
+// Phase 4: serializable snapshot of the persistent slice of state. Same shape
+// in both localStorage and Firestore so they're interchangeable.
+function buildStateSnapshot() {
+  return {
+    library: state.library,
+    favorites: Array.from(state.favorites),
+    played: Array.from(state.played),
+    volume: state.volume,
+    shuffle: state.shuffle,
+    repeat: state.repeat,
+    size: state.size,
+    quality: state.quality
+  };
+}
+
 function saveState() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      library: state.library,
-      favorites: Array.from(state.favorites),
-      played: Array.from(state.played),
-      volume: state.volume,
-      shuffle: state.shuffle,
-      repeat: state.repeat,
-      size: state.size,
-      quality: state.quality
-    })
-  );
+  const snapshot = buildStateSnapshot();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot)); } catch {}
+  scheduleFirestoreSave(snapshot);
+}
+
+// Phase 4: debounced Firestore writer. Pushes a snapshot 2s after the last
+// state change. Only writes when there's a signed-in user.
+let firestoreSaveTimer = null;
+function scheduleFirestoreSave(snapshot) {
+  const user = window.__mp_user;
+  if (!user || !user.uid) return;  // not signed in yet — localStorage only
+  if (firestoreSaveTimer) clearTimeout(firestoreSaveTimer);
+  firestoreSaveTimer = setTimeout(() => {
+    saveUserState(user.uid, snapshot).catch((e) => console.error('[fb] save:', e));
+  }, 2000);
+}
+
+// Phase 4: when the user signs in, fetch their cloud snapshot and merge it
+// over local state. The cloud copy wins on conflict (because it survives
+// cookie-clear; localStorage doesn't).
+async function syncStateFromFirestoreOnAuth(user) {
+  if (!user || !user.uid) return;
+  const cloud = await fetchUserState(user.uid);
+  if (!cloud) {
+    // First time on this account on this app — push the local state up so it's safe.
+    saveUserState(user.uid, buildStateSnapshot()).catch(() => {});
+    return;
+  }
+  // Cloud wins. Apply, then re-render the affected UI bits.
+  applyStateFromSaved(cloud);
+  try {
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof renderLibrary === 'function') renderLibrary();
+    if (typeof renderStats === 'function') renderStats();
+  } catch (err) {
+    console.error('[fb] render after sync failed:', err);
+  }
+  // Also persist the cloud copy into localStorage so the next reload is
+  // instant (Firestore can take 200-800ms to fetch).
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud)); } catch {}
+}
+
+// Subscribe to auth changes (set up by authGate.js). When user signs in,
+// pull cloud state.
+if (typeof window !== 'undefined') {
+  if (!window.__mp_user_listeners) window.__mp_user_listeners = new Set();
+  window.__mp_user_listeners.add((user) => {
+    if (user) syncStateFromFirestoreOnAuth(user);
+  });
 }
 
 function bindEvents() {
