@@ -74,6 +74,19 @@ export function scoreVideoQuality(result, artistName = "") {
   if (channelIsOfficial) { score += 25; reasons.push("official channel"); }
   if (channelMatchesArtist) { score += 20; reasons.push("artist channel"); }
 
+  // Universal wrong-artist penalty (ported from arnies-music-vault, May 10 2026).
+  // If neither the title nor the channel mentions ANY meaningful artist word,
+  // it's almost certainly the wrong artist for an artist-mode search. Pre-fix,
+  // popular off-topic videos with high view counts could outrank correct artist
+  // results that happened to be less popular.
+  const artistWords = artistLower.split(/\s+/).filter((w) => w.length > 2);
+  const artistInTitle = artistWords.length > 0 && artistWords.some((w) => title.includes(w));
+  const artistInChannelLoose = artistWords.length > 0 && artistWords.some((w) => channel.includes(w));
+  if (artistWords.length > 0 && !artistInTitle && !artistInChannelLoose) {
+    score -= 60;
+    reasons.push("wrong artist");
+  }
+
   // Title-based quality cues
   for (const pattern of GOOD_TITLE_PATTERNS) {
     if (pattern.test(title)) {
@@ -89,6 +102,17 @@ export function scoreVideoQuality(result, artistName = "") {
       reasons.push(`bad: ${bad}`);
       break; // one strike is enough
     }
+  }
+
+  // Lyric-video penalty (ported from arnies-music-vault, May 10 2026).
+  // The BAD_TITLE_KEYWORDS list catches "lyrics video" (with the s) but not
+  // "lyric video" (singular). Many official channels post Lyric Video uploads
+  // for songs that DO have a real music video — without this penalty the
+  // ranking would prefer the lyric upload because of its 'official' channel.
+  // -35 cleanly tips the scale toward real video content when both exist.
+  if (/\blyric/i.test(title)) {
+    score -= 35;
+    reasons.push("lyric video");
   }
 
   // Duration sanity — too short = clip/short, too long = compilation
