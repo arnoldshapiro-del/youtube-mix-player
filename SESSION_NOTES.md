@@ -1,5 +1,82 @@
 # SESSION NOTES — YouTube Mix Player
 
+## Session — 2026-05-10 (Music Vault port + 3 pre-existing bug fixes)
+
+While working on Music Vault Phase 3, Arnie asked me to study what had been
+added there and port any improvements that would benefit Mix Player. Found
+two scoring improvements directly applicable + uncovered three pre-existing
+Mix Player bugs that had to be fixed before the port could be verified live.
+
+### What we ported (commits 782493f → 1cd7ede → 29fe443 → d734ea7)
+
+**src/qualityScorer.js: two new penalties from arnies-music-vault**
+
+1. Universal -60 wrong-artist penalty. When neither the title nor the
+   channel mentions any meaningful word from the user's searched artist, the
+   result is almost certainly wrong-artist. Pre-fix, popular off-topic
+   videos with high view counts could outrank correct-artist results that
+   happened to be less popular (e.g. a Cohen 'Hallelujah' search returning
+   Pentatonix's cover at the top).
+2. -35 lyric-video penalty. The bad-keyword list catches 'lyrics video'
+   (with the s) but 'Official Lyric Video' uploads were scoring high
+   because GOOD_TITLE_PATTERNS rewards 'official'. -35 cleanly tips toward
+   real visual content when a music video also exists.
+
+Verified live after deploy:
+- /api/hq-artist?artist=Dave+Loggins returns ZERO lyric videos in top 5
+- /api/hq-artist?artist=Leonard+Cohen returns 5 authentic Cohen recordings
+  in top 5 (Hallelujah Live London 2008 at top, score 105)
+
+### Pre-existing bugs found and fixed
+
+**1. Missing /api/* redirect** (commit 29fe443)
+The frontend (src/main.js) calls /api/hq-artist, /api/resolve-youtube,
+/api/search-youtube, /api/starter-pack — but production netlify.toml had no
+redirect rule from /api/* to /.netlify/functions/:splat. So the production
+HQ artist search, mix resolver, search bar, and starter pack ALL returned
+404 to users. Worked locally only because server.js bound those paths
+itself.
+
+Fix:
+```toml
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+```
+
+**2. Missing build command** (commit d734ea7)
+netlify.toml had `[build] publish = "."` with no `command`. Netlify's
+auto-detection on the noble image now tries to run `npm run build` even
+though Mix Player has no build script. The build failed with exit code 2,
+preventing functions from bundling at all (fns=0 in deploy artifact, all
+function URLs returned 404 even when /api/* redirect was in place).
+
+Fix: `command = "npm install --no-audit --no-fund"` — installs deps so
+esbuild has what it needs to bundle .mts function files; doesn't need an
+actual build step beyond that.
+
+**3. Same noble-new-builds + Node 22.22.2 regression as Music Vault**
+(commit 2e7e30e)
+
+Pinned NODE_VERSION = "20" in [build.environment]. Even with this pin,
+fresh pushes still occasionally fail nondeterministically with exit code 2;
+clearing the build cache via the Netlify API
+(POST /sites/{id}/builds {clear_cache:true}) reliably succeeds. See
+`~/.claude/projects/.../memory/netlify_vite_build_fix.md` for full details.
+
+### Notes for the next session
+
+- Mix Player's scoring engine is now in sync with Music Vault's. Future
+  scoring tweaks in either project should be ported to the other.
+- Functions are now properly deployed and working in production. The site
+  was effectively broken in production before today's fixes.
+- The cache-clear-as-workaround pattern is documented in memory; if a push
+  fails with exit code 2, immediately try cache-clear before assuming the
+  code is wrong.
+
+---
+
 ## Session — 2026-05-09
 **What we did:**
 - Took the YouTube Mix Player code that ChatGPT 5.5 built and dropped in `C:\Users\arnol\Documents\New project\youtube-mix-player`

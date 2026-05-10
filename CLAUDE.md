@@ -6,6 +6,17 @@ Standalone web app that imports YouTube video, playlist, or Mix URLs, extracts t
 ## Origin
 Built originally by ChatGPT 5.5 (May 9, 2026). Code was placed in `C:\Users\arnol\Documents\New project\youtube-mix-player`. Claude Code (Opus 4.7) verified the local server worked, moved it to the standard `Project Files Do Not Delete` location, set up GitHub + Netlify deployment per Arnie's standard workflow.
 
+## Status update — May 10, 2026
+Two scoring penalties ported from arnies-music-vault: -60 universal wrong-
+artist penalty (Cohen 'Hallelujah' searches no longer return Pentatonix's
+cover at top) and -35 lyric-video penalty (Video slot equivalent). Plus
+three pre-existing production bugs found and fixed: missing `/api/*` →
+`/.netlify/functions/:splat` redirect, missing build command (was breaking
+.mts function bundling), and the same noble-new-builds + Node 22.22.2
+regression that hit Music Vault. All four production functions
+(`resolve-youtube`, `search-youtube`, `starter-pack`, `hq-artist`) now
+verified working in production. See SESSION_NOTES.md for details.
+
 ## GitHub Repo
 arnoldshapiro-del/youtube-mix-player
 
