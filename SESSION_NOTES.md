@@ -1,5 +1,72 @@
 # SESSION NOTES — YouTube Mix Player
 
+## Session — 2026-05-11 (Firebase Auth + Firestore — saved mixes are now permanent)
+
+### Why
+Arnie cleared browser cookies on May 11 morning following well-intended
+instructions. Chrome's "Cookies and other site data" clear also wipes
+localStorage. Mix Player had no cloud backup — saved mixes (~15) gone
+permanently. Music Vault survived because it's been on Firebase since April.
+Arnie demanded permanent memory for Mix Player so this can never repeat.
+
+### What we shipped (commits 3f16474 and d2a7fde)
+
+**src/firebase.js (new)**
+- ES module imports from gstatic CDN (Mix Player has no npm/bundler;
+  CDN modules match the project's vanilla-JS architecture)
+- Uses existing shapiro-apps Firebase project (same as Music Vault)
+- Exports: signIn, signOutUser, isUserAllowed, fetchUserState,
+  saveUserState, onUserChange, getCurrentUser
+
+**src/authGate.js (new)**
+- Loaded BEFORE main.js. Hides app shell via html[data-auth-gate=pending]
+  while checking auth. On signed-in + allowlisted: opens the gate.
+- Allowlist deny: friendly error + auto sign-out
+- Broadcasts user changes via window.__mp_user_listeners so main.js
+  can sync state on auth change
+
+**src/main.js**
+- Imports fetchUserState/saveUserState from firebase.js
+- loadSavedState refactored: applyStateFromSaved() pulled out for reuse
+- saveState now also schedules a 2s-debounced Firestore write via
+  scheduleFirestoreSave()
+- syncStateFromFirestoreOnAuth: on user sign-in, fetch cloud state
+  (cloud wins on conflict), re-render UI, write to localStorage cache
+- Subscribes to window.__mp_user_listeners
+
+**index.html**
+- Loads ./src/authGate.js as ES module BEFORE ./src/main.js
+- Adds the auth-gate overlay (hidden until JS shows it)
+- Adds the auth-pill (sign-out + sync indicator) for signed-in state
+
+**styles.css**
+- ~80 lines of CSS for .auth-gate / .auth-gate-card / .auth-gate-button /
+  .auth-pill. Matches Mix Player aesthetic (#f5533d red/orange).
+- html[data-auth-gate=pending|denied] hides .app-shell to prevent FOUC
+
+### Firebase admin config (already done before commit)
+- youtube-mix-player.netlify.app added to Firebase Authorized Domains via
+  identitytoolkit.googleapis.com PATCH
+- youtube-mix-player.netlify.app/* + *--youtube-mix-player.netlify.app/*
+  added to API key (AIzaSyBWKpWwPRFqjSxCmxSBpqZjLenlL7B7REU) HTTP referrer
+  allowlist via apikeys.googleapis.com PATCH
+- Both via ~/.claude/scripts/add-mix-player-firebase-config.js (preserved
+  for re-running if needed)
+
+### Gallery refresh (commit d2a7fde in arnies-app-showcase)
+- New Mix Player screenshot showing the auth gate (the public-facing UI now)
+- Tagline updated to mention Firebase sign-in + Firestore sync + the
+  May 10 HQ scoring port
+
+### What's next for Arnie
+- Sign in once at youtube-mix-player.netlify.app — bootstraps allowlist
+  to his email only
+- Add Ela + kids via Access Manager (arnie-access-manager.netlify.app)
+- Saved mixes from then on write to Firestore. Cookie clears can't lose
+  them ever again.
+
+---
+
 ## Session — 2026-05-10 (Music Vault port + 3 pre-existing bug fixes)
 
 While working on Music Vault Phase 3, Arnie asked me to study what had been
